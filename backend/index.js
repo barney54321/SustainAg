@@ -1,23 +1,29 @@
 require("dotenv").config();
 
+const path = require('path');
+
 const express = require("express");
 const { Client } = require("pg");
 const formData = require("form-data");
 const Mailgun = require("mailgun.js");
 
-const {receipt} = require("./receipt");
+const { receipt } = require("./receipt");
 
 /* Express Setup */
 const app = express();
 const port = 8100;
 
 app.use(express.json());
+app.use(express.static("public/build"));
 
 app.use(function (req, res, next) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,Content-Type,Accept,Authorization');
-    res.setHeader('Access-Control-Allow-Credentials', true);
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, PATCH, DELETE");
+    res.setHeader(
+        "Access-Control-Allow-Headers",
+        "X-Requested-With,Content-Type,Accept,Authorization"
+    );
+    res.setHeader("Access-Control-Allow-Credentials", true);
     next();
 });
 
@@ -49,14 +55,15 @@ app.get("/products/list", async (req, res) => {
 
 app.post("/products/buy", async (req, res) => {
     // Create the Order
-    const orderText = "INSERT INTO Orders (first, last, email, address) VALUES ($1, $2, $3, $4) RETURNING id";
+    const orderText =
+        "INSERT INTO Orders (first, last, email, address) VALUES ($1, $2, $3, $4) RETURNING id";
     const orderValues = [req.body.first, req.body.last, req.body.email, req.body.address];
 
     var outcome = await client.query(orderText, orderValues);
 
     const orderId = outcome.rows[0]["id"];
 
-    const productText = "INSERT INTO ProductOrders (orderid, product) VALUES ($1, $2)"
+    const productText = "INSERT INTO ProductOrders (orderid, product) VALUES ($1, $2)";
 
     // Order the products
     for (var i = 0; i < req.body.products.length; i++) {
@@ -68,9 +75,9 @@ app.post("/products/buy", async (req, res) => {
     try {
         const messageData = {
             from: "andrew@sustainagcal.com",
-            to: req.body.email, 
+            to: req.body.email,
             subject: "SustainAg Order Made",
-            html: receipt(req.body)                
+            html: receipt(req.body),
         };
 
         mailgunClient.messages.create(mailgunDomain, messageData);
@@ -81,9 +88,9 @@ app.post("/products/buy", async (req, res) => {
     try {
         const messageData = {
             from: "andrew@sustainagcal.com",
-            to: "andrewesteban1999@gmail.com", 
+            to: "andrewesteban1999@gmail.com",
             subject: "SustainAg Order Made",
-            html: receipt(req.body)                   
+            html: receipt(req.body),
         };
 
         mailgunClient.messages.create(mailgunDomain, messageData);
@@ -91,8 +98,8 @@ app.post("/products/buy", async (req, res) => {
         console.log(error);
     }
 
-    res.send({status: 200})
-})
+    res.send({ status: 200 });
+});
 
 /* Community endpoints */
 app.get("/community/list/:filter", async (req, res) => {
@@ -131,12 +138,13 @@ app.post("/community/post", async (req, res) => {
     var category = body["category"];
     var content = body["content"];
 
-    const text = "INSERT INTO Posts (first, last, email, title, content, category) VALUES ($1, $2, $3, $4, $5, $6)";
+    const text =
+        "INSERT INTO Posts (first, last, email, title, content, category) VALUES ($1, $2, $3, $4, $5, $6)";
     const values = [first, last, email, title, content, category];
 
     outcome = await client.query(text, values);
 
-    res.send({status: 200});
+    res.send({ status: 200 });
 });
 
 app.post("/community/comment", async (req, res) => {
@@ -148,12 +156,13 @@ app.post("/community/comment", async (req, res) => {
     var post = body["post"];
     var content = body["content"];
 
-    const text = "INSERT INTO Comments (first, last, email, content, post) VALUES ($1, $2, $3, $4, $5)";
+    const text =
+        "INSERT INTO Comments (first, last, email, content, post) VALUES ($1, $2, $3, $4, $5)";
     const values = [first, last, email, content, post];
 
     outcome = await client.query(text, values);
 
-    res.send({status: 200});
+    res.send({ status: 200 });
 });
 
 app.get("/community/post/:id", async (req, res) => {
@@ -161,8 +170,8 @@ app.get("/community/post/:id", async (req, res) => {
     var outcome = await client.query(`SELECT * FROM Posts WHERE id = $1`, [id]);
 
     var obj = {
-        post: outcome.rows[0]
-    }
+        post: outcome.rows[0],
+    };
 
     outcome = await client.query(`SELECT * FROM Comments WHERE post = $1 ORDER BY id ASC`, [id]);
 
@@ -275,7 +284,7 @@ app.post("/education/schedule", async (req, res) => {
     try {
         const messageData = {
             from: "andrew@sustainagcal.com",
-            to: email, 
+            to: email,
             subject: "Hello from SustainAg",
             html:
                 `<p>
@@ -334,14 +343,8 @@ app.post("/education/schedule", async (req, res) => {
     res.sendStatus(200);
 });
 
-/* Newsletter endpoints */
-app.post("/newsletter", (req, res) => {
-    console.log(req.body);
-    res.send(req.body);
-});
-
-app.get("/", (req, res) => {
-    res.send("Hello World!");
+app.get("*", (req, res) => {
+    res.sendFile(path.resolve(__dirname, "public/build", "index.html"));
 });
 
 app.listen(port, () => {
